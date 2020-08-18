@@ -51,8 +51,8 @@ const client = createClient({
 
 ### Should this exchange be listed before or after the cache exchange?
 
-I don't know. I have it listed before the grahp-cache exchange, but maybe that's
-stupid?
+This exchange should be listed before any cache exchange. Cache exchanges
+should represent the the data as returned by the endpoint.
 
 ### There are no tests, is this tested?
 
