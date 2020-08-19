@@ -42,6 +42,10 @@ function isFieldNode(
 }
 
 function mapScalars(data: any, path: PropertyKey[], map: ScalarMapper) {
+  if (data == null) {
+    return data;
+  }
+
   const newData = { ...data };
 
   let newSubData = newData;
@@ -60,7 +64,10 @@ function mapScalars(data: any, path: PropertyKey[], map: ScalarMapper) {
   }
 
   const finalSegment = path[path.length - 1];
-  newSubData[finalSegment] = map(newSubData[finalSegment]);
+
+  if (newSubData[finalSegment] != null) {
+    newSubData[finalSegment] = map(newSubData[finalSegment]);
+  }
 
   return newData;
 }
