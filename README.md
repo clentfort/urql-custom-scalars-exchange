@@ -54,10 +54,6 @@ const client = createClient({
 This exchange should be listed before any cache exchange. Cache exchanges
 should represent the the data as returned by the endpoint.
 
-### There are no tests, is this tested?
-
-Not automatically, no. PRs are welcome.
-
 ## Local Development
 
 Below is a list of commands you will probably find useful.
@@ -76,8 +72,6 @@ Your library will be rebuilt if you make edits.
 
 Bundles the package to the `dist` folder. The package is optimized and bundled
 with Rollup into multiple formats (CommonJS, UMD, and ES Module).
-
-<img src="https://user-images.githubusercontent.com/4060187/52168322-a98e5b00-26f6-11e9-8cf6-222d716b75ef.gif" width="600" />
 
 ### `npm test` or `yarn test`
 
