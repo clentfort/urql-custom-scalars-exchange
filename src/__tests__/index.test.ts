@@ -21,117 +21,90 @@ beforeEach(() => {
   ({ source: ops$, next } = makeSubject<Operation>());
 });
 
-it('transforms scalars in a simple object', () => {
-  const authorQuery = gql`
+const simpleData = 'a';
+const nestedData = { name: 'a' };
+
+const simple = {
+  query: gql`
     {
-      author {
-        id
+      simple
+    }
+  `,
+  data: { simple: simpleData },
+  calls: 1,
+};
+
+const nested = {
+  query: gql`
+    {
+      nested {
         name
       }
     }
-  `;
+  `,
+  data: { nested: nestedData },
+  calls: 1,
+};
 
-  const authorQueryData = {
-    __typename: 'Query',
-    author: { __typename: 'Author', id: '123', name: 'Author' },
-  };
-
-  const op = client.createRequestOperation('query', {
-    key: 1,
-    query: authorQuery,
-  });
-  const response = jest.fn(
-    (forwardOp: Operation): OperationResult => {
-      expect(forwardOp.key === op.key).toBeTruthy();
-
-      return {
-        operation: forwardOp,
-        data: authorQueryData,
-      };
-    }
-  );
-  const result = jest.fn();
-  const forward: ExchangeIO = ops$ => {
-    return pipe(ops$, map(response));
-  };
-
-  const scalars = {
-    String: jest.fn((text: string) => text),
-  };
-
-  pipe(
-    scalarExchange({
-      schema: (schema as unknown) as IntrospectionQuery,
-      scalars,
-    })({
-      forward,
-      client,
-      dispatchDebug,
-    })(ops$),
-    tap(result),
-    publish
-  );
-
-  next(op);
-  expect(scalars.String).toHaveBeenCalledWith('Author');
-  expect(result).toHaveBeenCalledTimes(1);
-});
-
-it('transforms scalars in a list response', () => {
-  const todosQuery = gql`
+const list = {
+  query: gql`
     {
-      todos {
-        id
-        text
+      list
+    }
+  `,
+  data: { list: [simpleData, simpleData] },
+  calls: 2,
+};
+
+const listNested = {
+  query: gql`
+    {
+      listNested {
+        name
       }
     }
-  `;
+  `,
+  data: { listNested: [nestedData, nestedData] },
+  calls: 2,
+};
 
-  const todosQueryData = {
-    __typename: 'Query',
-    todos: [
-      { __typename: 'Todo', id: '123', text: 'text1' },
-      { __typename: 'Todo', id: '456', text: 'text2' },
-    ],
-  };
+test.each([simple, nested, list, listNested])(
+  'works on different structures',
+  ({ query, data, calls }) => {
+    const op = client.createRequestOperation('query', { key: 1, query });
 
-  const op = client.createRequestOperation('query', {
-    key: 1,
-    query: todosQuery,
-  });
-  const response = jest.fn(
-    (forwardOp: Operation): OperationResult => {
-      expect(forwardOp.key === op.key).toBeTruthy();
+    const response = jest.fn(
+      (forwardOp: Operation): OperationResult => {
+        expect(forwardOp.key === op.key).toBeTruthy();
+        return {
+          operation: forwardOp,
+          data: { __typename: 'Query', ...data },
+        };
+      }
+    );
+    const result = jest.fn();
+    const forward: ExchangeIO = ops$ => pipe(ops$, map(response));
 
-      return {
-        operation: forwardOp,
-        data: todosQueryData,
-      };
-    }
-  );
-  const result = jest.fn();
-  const forward: ExchangeIO = ops$ => {
-    return pipe(ops$, map(response));
-  };
+    const scalars = {
+      String: jest.fn((text: string) => text),
+    };
 
-  const scalars = {
-    String: jest.fn((text: string) => text),
-  };
+    pipe(
+      scalarExchange({
+        schema: (schema as unknown) as IntrospectionQuery,
+        scalars,
+      })({
+        forward,
+        client,
+        dispatchDebug,
+      })(ops$),
+      tap(result),
+      publish
+    );
 
-  pipe(
-    scalarExchange({
-      schema: (schema as unknown) as IntrospectionQuery,
-      scalars,
-    })({
-      forward,
-      client,
-      dispatchDebug,
-    })(ops$),
-    tap(result),
-    publish
-  );
+    next(op);
 
-  next(op);
-  expect(scalars.String).toHaveBeenCalledTimes(2);
-  expect(result).toHaveBeenCalledTimes(1);
-});
+    expect(scalars.String).toHaveBeenCalledTimes(calls);
+    expect(result).toHaveBeenCalledTimes(1);
+  }
+);

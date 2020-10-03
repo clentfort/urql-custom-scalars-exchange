@@ -4,10 +4,12 @@ import {
   ASTNode,
   DocumentNode,
   FieldNode,
+  GraphQLOutputType,
   GraphQLScalarType,
   IntrospectionQuery,
   TypeInfo,
   buildClientSchema,
+  isListType,
   isNonNullType,
   isScalarType,
   visit,
@@ -65,7 +67,9 @@ function mapScalars(data: any, path: PropertyKey[], map: ScalarMapper) {
 
   const finalSegment = path[path.length - 1];
 
-  if (newSubData[finalSegment] != null) {
+  if (Array.isArray(newSubData[finalSegment])) {
+    newSubData[finalSegment] = newSubData[finalSegment].map(map);
+  } else if (newSubData[finalSegment] != null) {
     newSubData[finalSegment] = map(newSubData[finalSegment]);
   }
 
@@ -75,6 +79,22 @@ function mapScalars(data: any, path: PropertyKey[], map: ScalarMapper) {
 interface ScalarExchangeOptions {
   scalars: ScalarMappings;
   schema: IntrospectionQuery;
+}
+
+function unpackTypeInner(type: GraphQLOutputType): GraphQLOutputType | void {
+  if (isListType(type) || isNonNullType(type)) {
+    return unpackTypeInner(type.ofType);
+  }
+
+  if (isScalarType(type)) {
+    return type;
+  }
+
+  return;
+}
+
+function unpackType(type: GraphQLOutputType): GraphQLScalarType | void {
+  return unpackTypeInner(type) as GraphQLScalarType | void;
 }
 
 export default function scalarExchange({
@@ -91,12 +111,8 @@ export default function scalarExchange({
           return;
         }
 
-        let scalarType: GraphQLScalarType;
-        if (isScalarType(fieldType)) {
-          scalarType = fieldType;
-        } else if (isNonNullType(fieldType) && isScalarType(fieldType.ofType)) {
-          scalarType = fieldType.ofType;
-        } else {
+        const scalarType = unpackType(fieldType);
+        if (scalarType == null) {
           return;
         }
 
