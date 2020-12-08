@@ -46,6 +46,18 @@ const nested = {
   calls: 1,
 };
 
+const nestedNullable = {
+  query: gql`
+    {
+      nestedNullable {
+        name
+      }
+    }
+  `,
+  data: { nestedNullable: null },
+  calls: 0,
+};
+
 const list = {
   query: gql`
     {
@@ -68,43 +80,59 @@ const listNested = {
   calls: 2,
 };
 
-test.each([simple, nested, list, listNested])(
-  'works on different structures',
-  ({ query, data, calls }) => {
-    const op = client.createRequestOperation('query', { key: 1, query });
-
-    const response = jest.fn(
-      (forwardOp: Operation): OperationResult => {
-        expect(forwardOp.key === op.key).toBeTruthy();
-        return {
-          operation: forwardOp,
-          data: { __typename: 'Query', ...data },
-        };
+const listNestedNullable = {
+  query: gql`
+    {
+      listNestedNullable {
+        name
       }
-    );
-    const result = jest.fn();
-    const forward: ExchangeIO = ops$ => pipe(ops$, map(response));
+    }
+  `,
+  data: { listNestedNullable: null },
+  calls: 0,
+};
 
-    const scalars = {
-      String: jest.fn((text: string) => text),
-    };
+test.each([
+  simple,
+  nested,
+  nestedNullable,
+  list,
+  listNested,
+  listNestedNullable,
+])('works on different structures', ({ query, data, calls }) => {
+  const op = client.createRequestOperation('query', { key: 1, query });
 
-    pipe(
-      scalarExchange({
-        schema: (schema as unknown) as IntrospectionQuery,
-        scalars,
-      })({
-        forward,
-        client,
-        dispatchDebug,
-      })(ops$),
-      tap(result),
-      publish
-    );
+  const response = jest.fn(
+    (forwardOp: Operation): OperationResult => {
+      expect(forwardOp.key === op.key).toBeTruthy();
+      return {
+        operation: forwardOp,
+        data: { __typename: 'Query', ...data },
+      };
+    }
+  );
+  const result = jest.fn();
+  const forward: ExchangeIO = ops$ => pipe(ops$, map(response));
 
-    next(op);
+  const scalars = {
+    String: jest.fn((text: string) => text),
+  };
 
-    expect(scalars.String).toHaveBeenCalledTimes(calls);
-    expect(result).toHaveBeenCalledTimes(1);
-  }
-);
+  pipe(
+    scalarExchange({
+      schema: (schema as unknown) as IntrospectionQuery,
+      scalars,
+    })({
+      forward,
+      client,
+      dispatchDebug,
+    })(ops$),
+    tap(result),
+    publish
+  );
+
+  next(op);
+
+  expect(scalars.String).toHaveBeenCalledTimes(calls);
+  expect(result).toHaveBeenCalledTimes(1);
+});
