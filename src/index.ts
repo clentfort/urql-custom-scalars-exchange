@@ -59,6 +59,8 @@ function mapScalars(data: any, path: PropertyKey[], map: ScalarMapper) {
         mapScalars(subData, subPath, map)
       );
       return newData;
+    } else if (newSubData[segment] === null) {
+      return newData;
     } else {
       newSubData[segment] = { ...newSubData[segment] };
     }
