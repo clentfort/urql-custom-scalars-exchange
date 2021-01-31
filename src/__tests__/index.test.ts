@@ -92,13 +92,47 @@ const listNestedNullable = {
   calls: 0,
 };
 
+const fragment1 = {
+  query: gql`
+    {
+      ...QueryFields
+    }
+
+    fragment QueryFields on Query {
+      listNested {
+        name
+      }
+    }
+  `,
+  data: { listNested: [nestedData] },
+  calls: 1,
+};
+
+const fragment2 = {
+  query: gql`
+    {
+      listNested {
+        ...ListFields
+      }
+    }
+
+    fragment ListFields on Nested {
+      name
+    }
+  `,
+  data: { listNested: [nestedData, nestedData] },
+  calls: 2,
+};
+
 test.each([
-  simple,
-  nested,
-  nestedNullable,
+  fragment1,
+  fragment2,
   list,
   listNested,
   listNestedNullable,
+  nested,
+  nestedNullable,
+  simple,
 ])('works on different structures', ({ query, data, calls }) => {
   const op = client.createRequestOperation('query', { key: 1, query });
 
@@ -115,7 +149,9 @@ test.each([
   const forward: ExchangeIO = ops$ => pipe(ops$, map(response));
 
   const scalars = {
-    String: jest.fn((text: string) => text),
+    String: jest.fn((text: string) => {
+      return text;
+    }),
   };
 
   pipe(
