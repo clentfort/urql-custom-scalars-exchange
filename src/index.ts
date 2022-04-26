@@ -219,7 +219,7 @@ export default function scalarExchange({
 
         const spreadFragmentsInQuery: Record<
           string,
-          FragmentSpreadInQuery
+          FragmentSpreadInQuery[]
         > = {};
         const scalarsInQuery: ScalarInQuery[] = [];
 
@@ -229,22 +229,24 @@ export default function scalarExchange({
             scalarsInQuery.push(nodeOfInterest as ScalarInQuery);
           } else {
             const { name } = nodeOfInterest;
-            spreadFragmentsInQuery[
-              name
-            ] = nodeOfInterest as FragmentSpreadInQuery;
+            spreadFragmentsInQuery[name] = spreadFragmentsInQuery[name] ?? [];
+            spreadFragmentsInQuery[name].push(
+              nodeOfInterest as FragmentSpreadInQuery
+            );
           }
         }
 
         for (const { fragmentName, name, path } of scalarsInQuery) {
           if (fragmentName && spreadFragmentsInQuery[fragmentName]) {
-            const { path: pathToFragment } = spreadFragmentsInQuery[
+            for (const { path: pathToFragment } of spreadFragmentsInQuery[
               fragmentName
-            ];
-            args.data = mapScalar(
-              args.data,
-              [...pathToFragment, ...path],
-              scalars[name]
-            );
+            ]) {
+              args.data = mapScalar(
+                args.data,
+                [...pathToFragment, ...path],
+                scalars[name]
+              );
+            }
           } else {
             args.data = mapScalar(args.data, path, scalars[name]);
           }
