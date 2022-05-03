@@ -15,6 +15,7 @@ const schema = buildSchema(/* GraphQL */ `
 
   type Nested {
     name: String!
+    deeplyNested: Nested
   }
 `);
 
