@@ -140,7 +140,7 @@ const repeatedFragment = {
       }
     }
   `,
-  data: { first: nestedData, second: nestedData },
+  data: { nested: nestedData },
   calls: 2,
 };
 
