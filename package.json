@@ -47,5 +47,10 @@
     "@urql/core": "^3.0.0",
     "graphql": "^16.0.0",
     "wonka": "^6.0.0"
+  },
+  "resolutions": {
+    "**/typescript": "^4.7.4",
+    "**/@typescript-eslint/eslint-plugin": "^5.16.0",
+    "**/@typescript-eslint/parser": "^5.16.0"
   }
 }
