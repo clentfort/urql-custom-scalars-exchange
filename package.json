@@ -33,15 +33,15 @@
   "author": "Christian Lentfort",
   "module": "dist/urql-custom-scalars-exchange.esm.js",
   "devDependencies": {
-    "graphql-tag": "^2.11.0",
+    "graphql-tag": "^2.12.6",
     "husky": "^4.2.5",
-    "tsdx": "^0.13.2",
-    "tslib": "^2.0.1",
-    "typescript": "^3.9.7"
+    "tsdx": "^0.14.1",
+    "tslib": "^2.4.0",
+    "typescript": "^4.7.4"
   },
   "dependencies": {
-    "@urql/core": "^1.12.3 || ^2.0.0",
-    "graphql": "^15.3.0",
-    "wonka": "^4.0.14"
+    "@urql/core": "^3.0.0",
+    "graphql": "^16.0.0",
+    "wonka": "^6.0.0"
   }
 }

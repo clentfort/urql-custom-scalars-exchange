@@ -18,10 +18,10 @@ const schema = buildSchema(/* GraphQL */ `
   }
 `);
 
-export default graphql(
+export default graphql({
   schema,
-  getIntrospectionQuery({ descriptions: false })
-).then(({ data }) => data as IntrospectionQuery);
+  source: getIntrospectionQuery({ descriptions: false }),
+}).then(({ data }) => (data as unknown) as IntrospectionQuery);
 
 // const root = {
 //   simple: () => 'a',

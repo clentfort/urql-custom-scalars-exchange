@@ -9,6 +9,7 @@ import {
   isListType,
   isNonNullType,
   isScalarType,
+  Kind,
   TypeInfo,
   visit,
   visitWithTypeInfo,
@@ -58,9 +59,9 @@ function makeIsAstNodeOfKind<T extends ASTNode>(kind: ASTNode['kind']) {
   };
 }
 
-const isFieldNode = makeIsAstNodeOfKind<FieldNode>('Field');
+const isFieldNode = makeIsAstNodeOfKind<FieldNode>(Kind.FIELD);
 const isFragmentDefinition = makeIsAstNodeOfKind<FragmentDefinitionNode>(
-  'FragmentDefinition'
+  Kind.FRAGMENT_DEFINITION
 );
 
 function mapScalar(data: any, path: PropertyKey[], map: ScalarMapping) {

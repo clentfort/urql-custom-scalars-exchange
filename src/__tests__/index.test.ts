@@ -155,7 +155,11 @@ test.each([
   repeatedFragment,
   simple,
 ])('works on different structures', ({ query, data, calls }) => {
-  const op = client.createRequestOperation('query', { key: 1, query });
+  const op = client.createRequestOperation('query', {
+    key: 1,
+    query,
+    variables: {},
+  });
 
   const response = jest.fn(
     (forwardOp: Operation): OperationResult => {
