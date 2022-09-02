@@ -15,7 +15,8 @@
     "build": "tsdx build",
     "test": "tsdx test",
     "lint": "tsdx lint",
-    "prepare": "tsdx build"
+    "prepare": "tsdx build",
+    "generate-fixtures": "npx tsx src/__tests__/__fixtures__/schema.ts"
   },
   "peerDependencies": {
     "@urql/core": "^1.12.3 || ^2.0.0 || ^3.0.0",
