@@ -85,6 +85,21 @@
             },
             "isDeprecated": false,
             "deprecationReason": null
+          },
+          {
+            "name": "parentNested",
+            "args": [],
+            "type": {
+              "kind": "NON_NULL",
+              "name": null,
+              "ofType": {
+                "kind": "OBJECT",
+                "name": "ParentNested",
+                "ofType": null
+              }
+            },
+            "isDeprecated": false,
+            "deprecationReason": null
           }
         ],
         "inputFields": null,
