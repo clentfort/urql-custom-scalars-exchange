@@ -147,7 +147,7 @@ export default function scalarExchange({
   ): ScalarWithPath[] => {
     const nodesInQuery: NodeWithPath[] = [];
     // Keyed by fragment name.
-    const nodesInFragments: Record<string, NodeWithPath[]> = {};
+    const nodesInFragments: Partial<Record<string, NodeWithPath[]>> = {};
 
     const visitor = visitWithTypeInfo(typeInfoInstance, {
       Field(_node, _key, _parent, astPath, ancestorAstNodes) {
@@ -176,7 +176,7 @@ export default function scalarExchange({
           nodesInQuery.push(scalarInNode);
         } else {
           nodesInFragments[fragmentName] = nodesInFragments[fragmentName] ?? [];
-          nodesInFragments[fragmentName].push(scalarInNode);
+          nodesInFragments[fragmentName]!.push(scalarInNode);
         }
       },
       FragmentSpread(node, _key, _parent, astPath, ancestorAstNodes) {
@@ -194,7 +194,7 @@ export default function scalarExchange({
           nodesInQuery.push(fragmentInNode);
         } else {
           nodesInFragments[fragmentName] = nodesInFragments[fragmentName] ?? [];
-          nodesInFragments[fragmentName].push(fragmentInNode);
+          nodesInFragments[fragmentName]!.push(fragmentInNode);
         }
       },
     });
@@ -216,7 +216,7 @@ export default function scalarExchange({
       }
 
       const scalarsInFragment: ScalarWithPath[] = [];
-      nodesInFragments[fragmentName].forEach(nodeWithPath => {
+      nodesInFragments[fragmentName]?.forEach(nodeWithPath => {
         if (nodeWithPath.kind === 'scalar') {
           scalarsInFragment.push(nodeWithPath);
         } else if (nodeWithPath.kind === 'fragment') {
