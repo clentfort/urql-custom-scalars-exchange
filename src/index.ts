@@ -41,10 +41,10 @@ type NodeWithPath = ScalarInNode | FragmentInNode;
 
 function traverseAncestors(
   astPath: ReadonlyArray<number | string>,
-  anchestorAstNodes: ReadonlyArray<ASTNode | ReadonlyArray<ASTNode>>,
+  ancestorAstNodes: ReadonlyArray<ASTNode | readonly ASTNode[]>,
   callback: (node: ASTNode) => void
 ): void {
-  let currentAstNode = anchestorAstNodes[0];
+  let currentAstNode = ancestorAstNodes[0];
   astPath.forEach(segment => {
     // @ts-expect-error
     currentAstNode = currentAstNode[segment];
@@ -56,11 +56,11 @@ function traverseAncestors(
 
 function getPathAndFragmentName(
   astPath: ReadonlyArray<number | string>,
-  anchestorAstNodes: ReadonlyArray<ASTNode | ReadonlyArray<ASTNode>>
+  ancestorAstNodes: ReadonlyArray<ASTNode | readonly ASTNode[]>
 ): [PropertyKey[], string | undefined] {
   const path: PropertyKey[] = [];
   let fragmentName: string | undefined;
-  traverseAncestors(astPath, anchestorAstNodes, node => {
+  traverseAncestors(astPath, ancestorAstNodes, node => {
     if (node.kind === Kind.FIELD) {
       if (node.alias) {
         path.push(node.alias.value);
@@ -75,7 +75,7 @@ function getPathAndFragmentName(
   return [path, fragmentName];
 }
 
-function mapScalar(data: any, path: PropertyKey[], map: ScalarMapping) {
+function mapScalar(data: any, path: PropertyKey[], mapping: ScalarMapping) {
   if (data == null) {
     return data;
   }
@@ -88,7 +88,7 @@ function mapScalar(data: any, path: PropertyKey[], map: ScalarMapping) {
     if (Array.isArray(newSubData[segment])) {
       const subPath = path.slice(index + 1);
       newSubData[segment] = newSubData[segment].map((subData: unknown) =>
-        mapScalar(subData, subPath, map)
+        mapScalar(subData, subPath, mapping)
       );
       return newData;
     } else if (newSubData[segment] === null) {
@@ -102,9 +102,9 @@ function mapScalar(data: any, path: PropertyKey[], map: ScalarMapping) {
   const finalSegment = path[path.length - 1];
 
   if (Array.isArray(newSubData[finalSegment])) {
-    newSubData[finalSegment] = newSubData[finalSegment].map(map);
+    newSubData[finalSegment] = newSubData[finalSegment].map(mapping);
   } else if (newSubData[finalSegment] != null) {
-    newSubData[finalSegment] = map(newSubData[finalSegment]);
+    newSubData[finalSegment] = mapping(newSubData[finalSegment]);
   }
 
   return newData;
@@ -215,10 +215,10 @@ export default function scalarExchange({
         return [];
       }
 
-      const scalars: ScalarWithPath[] = [];
+      const scalarsInFragment: ScalarWithPath[] = [];
       nodesInFragments[fragmentName].forEach(nodeWithPath => {
         if (nodeWithPath.kind === 'scalar') {
-          scalars.push(nodeWithPath);
+          scalarsInFragment.push(nodeWithPath);
         } else if (nodeWithPath.kind === 'fragment') {
           const newScalars: ScalarWithPath[] = resolveScalarsInFragment(
             nodeWithPath.fragmentName,
@@ -227,13 +227,13 @@ export default function scalarExchange({
             ...scalarWithPath,
             path: [...nodeWithPath.path, ...scalarWithPath.path],
           }));
-          scalars.push(...newScalars);
+          scalarsInFragment.push(...newScalars);
         } else {
           handleNever(nodeWithPath);
         }
       });
-      resolvedScalarsInFragments[fragmentName] = scalars;
-      return scalars;
+      resolvedScalarsInFragments[fragmentName] = scalarsInFragment;
+      return scalarsInFragment;
     };
 
     const scalarsInQuery: ScalarWithPath[] = [];
