@@ -1,8 +1,7 @@
-import { Exchange } from '@urql/core';
+import { AnyVariables, Exchange, TypedDocumentNode } from '@urql/core';
 import {
   ASTNode,
   buildClientSchema,
-  FieldNode,
   GraphQLOutputType,
   GraphQLScalarType,
   IntrospectionQuery,
@@ -14,17 +13,12 @@ import {
   visit,
   visitWithTypeInfo,
 } from 'graphql';
-import { FragmentDefinitionNode, isNode } from 'graphql/language/ast';
+import { DocumentNode, isNode } from 'graphql/language/ast';
 import { map, pipe } from 'wonka';
 
 type ScalarMapping = (input: any) => any;
 
-interface ScalarInQuery {
-  /**
-   * The name of the fragment if the field appeared inside of a fragment
-   */
-  fragmentName?: string;
-  kind: 'Scalar';
+interface ScalarWithPath {
   /**
    * The name of the scalar
    */
@@ -35,34 +29,51 @@ interface ScalarInQuery {
   path: PropertyKey[];
 }
 
-interface FragmentSpreadInQuery {
-  kind: 'FragmentSpread';
-  /**
-   * The name of the fragment that was spread
-   */
-  name: string;
-  /**
-   * The path to the fragment spread in the data returned from the server
-   */
+interface ScalarInNode extends ScalarWithPath {
+  kind: 'scalar';
+}
+interface FragmentInNode {
+  kind: 'fragment';
+  fragmentName: string;
   path: PropertyKey[];
 }
+type NodeWithPath = ScalarInNode | FragmentInNode;
 
-function makeIsAstNodeOfKind<T extends ASTNode>(kind: ASTNode['kind']) {
-  return (
-    maybeNodeOrArray: ASTNode | ReadonlyArray<ASTNode>
-  ): maybeNodeOrArray is T => {
-    if (!isNode(maybeNodeOrArray)) {
-      return false;
+function traverseAncestors(
+  astPath: ReadonlyArray<number | string>,
+  anchestorAstNodes: ReadonlyArray<ASTNode | ReadonlyArray<ASTNode>>,
+  callback: (node: ASTNode) => void
+): void {
+  let currentAstNode = anchestorAstNodes[0];
+  astPath.forEach(segment => {
+    // @ts-expect-error
+    currentAstNode = currentAstNode[segment];
+    if (isNode(currentAstNode)) {
+      callback(currentAstNode);
     }
-
-    return maybeNodeOrArray.kind === kind;
-  };
+  });
 }
 
-const isFieldNode = makeIsAstNodeOfKind<FieldNode>(Kind.FIELD);
-const isFragmentDefinition = makeIsAstNodeOfKind<FragmentDefinitionNode>(
-  Kind.FRAGMENT_DEFINITION
-);
+function getPathAndFragmentName(
+  astPath: ReadonlyArray<number | string>,
+  anchestorAstNodes: ReadonlyArray<ASTNode | ReadonlyArray<ASTNode>>
+): [PropertyKey[], string | undefined] {
+  const path: PropertyKey[] = [];
+  let fragmentName: string | undefined;
+  traverseAncestors(astPath, anchestorAstNodes, node => {
+    if (node.kind === Kind.FIELD) {
+      if (node.alias) {
+        path.push(node.alias.value);
+      } else {
+        path.push(node.name.value);
+      }
+    } else if (node.kind === Kind.FRAGMENT_DEFINITION) {
+      fragmentName = node.name.value;
+    }
+  });
+
+  return [path, fragmentName];
+}
 
 function mapScalar(data: any, path: PropertyKey[], map: ScalarMapping) {
   if (data == null) {
@@ -120,6 +131,10 @@ function unpackType(type: GraphQLOutputType): GraphQLScalarType | void {
   return unpackTypeInner(type) as GraphQLScalarType | void;
 }
 
+function handleNever(value: never): never {
+  return value;
+}
+
 export default function scalarExchange({
   schema,
   scalars,
@@ -127,11 +142,15 @@ export default function scalarExchange({
   const clientSchema = buildClientSchema(schema);
   const typeInfoInstance = new TypeInfo(clientSchema);
 
-  const makeVisitor = (
-    nodesOfInterest: Array<ScalarInQuery | FragmentSpreadInQuery>
-  ) =>
-    visitWithTypeInfo(typeInfoInstance, {
-      Field(_node, _key, _parent, astPath, anchestorAstNodes) {
+  const getScalarsInQuery = (
+    query: DocumentNode | TypedDocumentNode<any, AnyVariables>
+  ): ScalarWithPath[] => {
+    const nodesInQuery: NodeWithPath[] = [];
+    // Keyed by fragment name.
+    const nodesInFragments: Record<string, NodeWithPath[]> = {};
+
+    const visitor = visitWithTypeInfo(typeInfoInstance, {
+      Field(_node, _key, _parent, astPath, ancestorAstNodes) {
         const fieldType = typeInfoInstance.getType();
         if (fieldType == null) {
           return;
@@ -143,63 +162,98 @@ export default function scalarExchange({
         }
 
         const { name } = scalarType;
-
         if (scalars[name] == null) {
           return;
         }
 
-        let currentAstNode: ASTNode | ReadonlyArray<ASTNode> =
-          anchestorAstNodes[0];
+        const [path, fragmentName] = getPathAndFragmentName(
+          astPath,
+          ancestorAstNodes
+        );
 
-        const path: PropertyKey[] = [];
-        let fragmentName: string | undefined;
-        for (const segment of astPath) {
-          // @ts-expect-error
-          currentAstNode = currentAstNode[segment];
-          if (isFieldNode(currentAstNode)) {
-            const fieldNode = currentAstNode as FieldNode;
-            if (fieldNode.alias) {
-              path.push(fieldNode.alias.value);
-            } else {
-              path.push(fieldNode.name.value);
-            }
-          } else if (isFragmentDefinition(currentAstNode)) {
-            fragmentName = currentAstNode.name.value;
-          }
+        const scalarInNode: ScalarInNode = { kind: 'scalar', name, path };
+        if (fragmentName == null) {
+          nodesInQuery.push(scalarInNode);
+        } else {
+          nodesInFragments[fragmentName] = nodesInFragments[fragmentName] ?? [];
+          nodesInFragments[fragmentName].push(scalarInNode);
         }
-
-        nodesOfInterest.push({
-          fragmentName,
-          kind: 'Scalar',
-          name,
-          path,
-        });
       },
-      FragmentSpread(node, _key, _parent, astPath, anchestorAstNodes) {
-        let currentAstNode: ASTNode | ReadonlyArray<ASTNode> =
-          anchestorAstNodes[0];
+      FragmentSpread(node, _key, _parent, astPath, ancestorAstNodes) {
+        const [path, fragmentName] = getPathAndFragmentName(
+          astPath,
+          ancestorAstNodes
+        );
 
-        const path: PropertyKey[] = [];
-        for (const segment of astPath) {
-          // @ts-expect-error
-          currentAstNode = currentAstNode[segment];
-          if (isFieldNode(currentAstNode)) {
-            const fieldNode = currentAstNode as FieldNode;
-            if (fieldNode.alias) {
-              path.push(fieldNode.alias.value);
-            } else {
-              path.push(fieldNode.name.value);
-            }
-          }
-        }
-
-        nodesOfInterest.push({
-          kind: 'FragmentSpread',
-          name: node.name.value,
+        const fragmentInNode: FragmentInNode = {
+          kind: 'fragment',
+          fragmentName: node.name.value,
           path,
-        });
+        };
+        if (fragmentName == null) {
+          nodesInQuery.push(fragmentInNode);
+        } else {
+          nodesInFragments[fragmentName] = nodesInFragments[fragmentName] ?? [];
+          nodesInFragments[fragmentName].push(fragmentInNode);
+        }
       },
     });
+    visit(query, visitor);
+
+    // Keyed by fragment name.
+    const resolvedScalarsInFragments: Record<string, ScalarWithPath[]> = {};
+    const resolveScalarsInFragment = (
+      fragmentName: string,
+      visitedFragmentNames: string[] = []
+    ): ScalarWithPath[] => {
+      if (resolvedScalarsInFragments[fragmentName]) {
+        return resolvedScalarsInFragments[fragmentName];
+      }
+
+      if (visitedFragmentNames.includes(fragmentName)) {
+        // There's a cycle in the nested fragments; we should do something here but not error (because it's technically legal).
+        return [];
+      }
+
+      const scalars: ScalarWithPath[] = [];
+      nodesInFragments[fragmentName].forEach(nodeWithPath => {
+        if (nodeWithPath.kind === 'scalar') {
+          scalars.push(nodeWithPath);
+        } else if (nodeWithPath.kind === 'fragment') {
+          const newScalars: ScalarWithPath[] = resolveScalarsInFragment(
+            nodeWithPath.fragmentName,
+            [...visitedFragmentNames, fragmentName]
+          ).map(scalarWithPath => ({
+            ...scalarWithPath,
+            path: [...nodeWithPath.path, ...scalarWithPath.path],
+          }));
+          scalars.push(...newScalars);
+        } else {
+          handleNever(nodeWithPath);
+        }
+      });
+      resolvedScalarsInFragments[fragmentName] = scalars;
+      return scalars;
+    };
+
+    const scalarsInQuery: ScalarWithPath[] = [];
+    nodesInQuery.forEach(nodeWithPath => {
+      if (nodeWithPath.kind === 'scalar') {
+        scalarsInQuery.push(nodeWithPath);
+      } else if (nodeWithPath.kind === 'fragment') {
+        const newScalars: ScalarWithPath[] = resolveScalarsInFragment(
+          nodeWithPath.fragmentName
+        ).map(scalarWithPath => ({
+          ...scalarWithPath,
+          path: [...nodeWithPath.path, ...scalarWithPath.path],
+        }));
+        scalarsInQuery.push(...newScalars);
+      } else {
+        handleNever(nodeWithPath);
+      }
+    });
+    return scalarsInQuery;
+  };
 
   return ({ forward }) => (operations$: any) => {
     const operationResult$ = forward(operations$);
@@ -209,50 +263,15 @@ export default function scalarExchange({
         if (args.data == null) {
           return args;
         }
-        const nodesOfInterest: Array<
-          FragmentSpreadInQuery | ScalarInQuery
-        > = [];
-        visit(args.operation.query, makeVisitor(nodesOfInterest));
 
-        if (nodesOfInterest.length === 0) {
+        const scalarsInQuery = getScalarsInQuery(args.operation.query);
+        if (scalarsInQuery.length === 0) {
           return args;
         }
 
-        const spreadFragmentsInQuery: Record<
-          string,
-          FragmentSpreadInQuery[]
-        > = {};
-        const scalarsInQuery: ScalarInQuery[] = [];
-
-        for (const nodeOfInterest of nodesOfInterest) {
-          const { kind } = nodeOfInterest;
-          if (kind === 'Scalar') {
-            scalarsInQuery.push(nodeOfInterest as ScalarInQuery);
-          } else {
-            const { name } = nodeOfInterest;
-            spreadFragmentsInQuery[name] = spreadFragmentsInQuery[name] ?? [];
-            spreadFragmentsInQuery[name].push(
-              nodeOfInterest as FragmentSpreadInQuery
-            );
-          }
-        }
-
-        for (const { fragmentName, name, path } of scalarsInQuery) {
-          if (fragmentName && spreadFragmentsInQuery[fragmentName]) {
-            for (const { path: pathToFragment } of spreadFragmentsInQuery[
-              fragmentName
-            ]) {
-              args.data = mapScalar(
-                args.data,
-                [...pathToFragment, ...path],
-                scalars[name]
-              );
-            }
-          } else {
-            args.data = mapScalar(args.data, path, scalars[name]);
-          }
-        }
-
+        scalarsInQuery.forEach(({ name, path }) => {
+          args.data = mapScalar(args.data, path, scalars[name]);
+        });
         return args;
       })
     );
