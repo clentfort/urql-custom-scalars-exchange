@@ -144,6 +144,36 @@ const repeatedFragment = {
   calls: 2,
 };
 
+const nestedFragment = {
+  query: gql`
+    query {
+      listNested {
+        ...nested1
+      }
+    }
+    fragment nested1 on Nested {
+      name
+      deeplyNested {
+        ...nested2
+      }
+    }
+    fragment nested2 on Nested {
+      name
+    }
+  `,
+  data: {
+    listNested: [
+      {
+        name: 'firstLevel',
+        deeplyNested: {
+          name: 'secondLevel',
+        },
+      },
+    ],
+  },
+  calls: 2,
+};
+
 test.each([
   fragment1,
   fragment2,
@@ -154,6 +184,7 @@ test.each([
   nestedNullable,
   repeatedFragment,
   simple,
+  nestedFragment,
 ])('works on different structures', ({ query, data, calls }) => {
   const op = client.createRequestOperation('query', {
     key: 1,
