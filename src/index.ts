@@ -64,9 +64,13 @@ const isFragmentDefinition = makeIsAstNodeOfKind<FragmentDefinitionNode>(
   Kind.FRAGMENT_DEFINITION
 );
 
-function mapScalar(data: any, path: PropertyKey[], map: ScalarMapping) {
+function mapScalar(data: any, path: PropertyKey[], map: ScalarMapping): any {
   if (data == null) {
     return data;
+  }
+
+  if (Array.isArray(data)) {
+    return data.map(subData => mapScalar(subData, path, map));
   }
 
   const newData = { ...data };
