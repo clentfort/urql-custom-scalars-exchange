@@ -15,7 +15,7 @@
     "build": "tsdx build",
     "test": "tsdx test",
     "lint": "tsdx lint",
-    "prepare": "tsdx build"
+    "prepare": "tsdx build --transpileOnly"
   },
   "peerDependencies": {
     "@urql/core": "^1.12.3 || ^2.0.0 || ^3.0.0",
