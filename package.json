@@ -18,7 +18,7 @@
     "prepare": "tsdx build"
   },
   "peerDependencies": {
-    "@urql/core": "^1.12.3 || ^2.0.0 || ^3.0.0",
+    "@urql/core": "^1.12.3 || ^2.0.0 || ^3.0.0 || ^4.0.0",
     "graphql": "^15.3.0 || ^16.0.0",
     "wonka": "^4.0.14 || ^6.0.0"
   },
@@ -37,7 +37,7 @@
   "author": "Christian Lentfort",
   "module": "dist/urql-custom-scalars-exchange.esm.js",
   "devDependencies": {
-    "@urql/core": "^3.0.0",
+    "@urql/core": "^4.0.0",
     "graphql": "^16.0.0",
     "graphql-tag": "^2.12.6",
     "husky": "^4.2.5",

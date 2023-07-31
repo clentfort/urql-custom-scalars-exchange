@@ -3,6 +3,8 @@ import {
   Operation,
   OperationResult,
   createClient,
+  cacheExchange,
+  fetchExchange,
 } from '@urql/core';
 import { IntrospectionQuery } from 'graphql';
 import gql from 'graphql-tag';
@@ -12,12 +14,16 @@ import scalarExchange from '../';
 import schema from './__fixtures__/schema.json';
 
 const dispatchDebug = jest.fn();
+const defaultExchanges = [cacheExchange, fetchExchange];
 
-let client = createClient({ url: 'http://0.0.0.0' });
+let client = createClient({
+  url: 'http://0.0.0.0',
+  exchanges: defaultExchanges,
+});
 let { source: ops$, next } = makeSubject<Operation>();
 
 beforeEach(() => {
-  client = createClient({ url: 'http://0.0.0.0' });
+  client = createClient({ url: 'http://0.0.0.0', exchanges: defaultExchanges });
   ({ source: ops$, next } = makeSubject<Operation>());
 });
 
@@ -167,6 +173,8 @@ test.each([
       return {
         operation: forwardOp,
         data: { __typename: 'Query', ...data },
+        stale: false,
+        hasNext: false,
       };
     }
   );
